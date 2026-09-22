@@ -43,9 +43,15 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Decode Release Keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release.keystore
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Decoding release keystore..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+          else
+            echo "KEYSTORE_BASE64 secret is not provided. Skipping keystore decode."
+          fi
 
       - name: Make gradlew executable
         run: chmod +x gradlew
