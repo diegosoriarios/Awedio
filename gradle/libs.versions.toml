@@ -10,7 +10,6 @@ kotlin = "2.2.10"
 composeBom = "2026.02.01"
 room = "2.6.1"
 ffmpegKit = "v4.4"
-ksp = "2.1.10-1.0.30"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,5 +33,5 @@ ffmpeg-kit-audio = { group = "com.github.tanersener", name = "mobile-ffmpeg", ve
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
