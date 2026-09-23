@@ -105,8 +105,10 @@ object AudioConverter {
             val bufferInfo = MediaCodec.BufferInfo()
             var inputDone = false
             var outputDone = false
+            var decodeStallCount = 0
             var outputSampleRate = inputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             var outputChannels = inputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            val maxStallCount = 50
 
             while (!outputDone) {
                 if (!inputDone) {
@@ -122,6 +124,7 @@ object AudioConverter {
                             } else {
                                 decoder.queueInputBuffer(inputBufferIndex, 0, sampleSize, extractor.sampleTime, 0)
                                 extractor.advance()
+                                decodeStallCount = 0
                             }
                         }
                     }
@@ -129,16 +132,29 @@ object AudioConverter {
 
                 val outputBufferIndex = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
                 when {
+                    outputBufferIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
+                        decodeStallCount++
+                        if (decodeStallCount >= maxStallCount) {
+                            AppLogger.e(TAG, "Decoder stalled $decodeStallCount consecutive times; aborting with ${pcmBytes.size()} PCM bytes collected.")
+                            break
+                        }
+                    }
                     outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        decodeStallCount = 0
                         val outputFormat = decoder.outputFormat
                         outputSampleRate = outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
                         outputChannels = outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
                         AppLogger.i(TAG, "Decoder output format changed: sampleRate=$outputSampleRate, channels=$outputChannels")
                     }
                     outputBufferIndex >= 0 -> {
+                        decodeStallCount = 0
                         val outputBuffer = decoder.getOutputBuffer(outputBufferIndex)
                         if (outputBuffer != null && bufferInfo.size > 0) {
-                            pcmBytes.write(outputBuffer.array(), outputBuffer.arrayOffset() + bufferInfo.offset, bufferInfo.size)
+                            outputBuffer.position(bufferInfo.offset)
+                            outputBuffer.limit(bufferInfo.offset + bufferInfo.size)
+                            val chunk = ByteArray(bufferInfo.size)
+                            outputBuffer.get(chunk)
+                            pcmBytes.write(chunk)
                         }
                         decoder.releaseOutputBuffer(outputBufferIndex, false)
                         if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
