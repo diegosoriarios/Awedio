@@ -81,7 +81,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isDownloadingModel.value = true
             _downloadProgress.value = 0f
-            _statusMessage.value = "Downloading whisper base model..."
+            _statusMessage.value = "Baixando modelo Whisper base (~142MB)..."
 
             ModelManager.downloadModel(
                 context = getApplication(),
@@ -92,7 +92,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _isDownloadingModel.value = false
                     if (success) {
                         _isModelDownloaded.value = true
-                        _statusMessage.value = "Whisper model downloaded successfully!"
+                        _statusMessage.value = "Modelo Whisper instalado com sucesso!"
                         _showModelMissingDialog.value = false
 
                         pendingAudioUri?.let { uri ->
@@ -100,7 +100,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             processAudioUri(uri)
                         }
                     } else {
-                        _statusMessage.value = "Model download error: ${error ?: "Unknown error"}"
+                        _statusMessage.value = "Erro no download: ${error ?: "Erro desconhecido"}"
                     }
                 }
             )
@@ -111,6 +111,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!ModelManager.isModelDownloaded(getApplication())) {
             pendingAudioUri = uri
             _showModelMissingDialog.value = true
+            _statusMessage.value = "Baixe o modelo Whisper (~142MB) para transcrever offline."
             return
         }
         processAudioUri(uri)
@@ -119,41 +120,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun processAudioUri(uri: Uri) {
         viewModelScope.launch {
             _isTranscribing.value = true
-            _statusMessage.value = "Converting audio voice note..."
+            _statusMessage.value = "Acessando nota de voz compartilhada..."
 
             val context = getApplication<Application>()
             val copiedFile = AudioConverter.copyUriToCache(context, uri)
             if (copiedFile == null) {
                 _isTranscribing.value = false
-                _statusMessage.value = "Failed to access shared audio file."
+                _statusMessage.value = "Erro: Não foi possível acessar o arquivo de áudio."
                 return@launch
             }
 
-            _statusMessage.value = "Converting to 16kHz mono WAV PCM..."
+            _statusMessage.value = "Convertendo áudio para PCM 16kHz via FFmpeg..."
             val wavFile = AudioConverter.convertTo16kHzWav(context, copiedFile)
             if (wavFile == null || !wavFile.exists()) {
                 _isTranscribing.value = false
-                _statusMessage.value = "Audio conversion failed."
+                _statusMessage.value = "Erro: Falha na conversão do arquivo de áudio."
                 return@launch
             }
 
-            _statusMessage.value = "Transcribing voice note with whisper.cpp (pt)..."
+            _statusMessage.value = "Transcrevendo áudio em Português com Whisper.cpp..."
             val transcribedText = withContext(Dispatchers.IO) {
                 try {
                     val modelFile = ModelManager.getModelFile(context)
                     val ctxPtr = whisperLib.initContext(modelFile.absolutePath)
                     if (ctxPtr == 0L) {
                         Log.e(TAG, "Failed to init whisper context")
-                        return@withContext "Error: Failed to initialize whisper model."
+                        return@withContext "Erro: Não foi possível inicializar o modelo Whisper."
                     }
 
                     val samples = WhisperLib.readWavSamples(wavFile)
+                    if (samples.isEmpty()) {
+                        whisperLib.freeContext(ctxPtr)
+                        return@withContext "Erro: Nenhuma amostra de áudio válida foi extraída."
+                    }
+
                     val result = whisperLib.transcribeBuffer(ctxPtr, samples, "pt")
                     whisperLib.freeContext(ctxPtr)
                     result
                 } catch (e: Exception) {
                     Log.e(TAG, "Transcription error: ${e.message}", e)
-                    "Error transcribing audio: ${e.message}"
+                    "Erro durante a transcrição: ${e.message}"
                 }
             }
 
@@ -171,9 +177,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val id = dao.insertTranscription(entity)
                 val newEntity = entity.copy(id = id)
                 _selectedTranscription.value = newEntity
-                _statusMessage.value = "Transcription completed!"
+                _statusMessage.value = "Transcrição concluída com sucesso!"
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving transcription to Room: ${e.message}", e)
+                _statusMessage.value = "Transcrição concluída!"
             }
         }
     }

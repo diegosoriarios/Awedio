@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -44,19 +45,51 @@ class MainActivity : ComponentActivity() {
 
         Log.i(TAG, "Incoming intent action: $action, type: $type")
 
-        if (Intent.ACTION_SEND == action && type != null && type.startsWith("audio/")) {
-            val audioUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-            }
+        if (Intent.ACTION_SEND == action || Intent.ACTION_VIEW == action || Intent.ACTION_SEND_MULTIPLE == action) {
+            val audioUri = extractAudioUri(intent)
 
-            audioUri?.let { uri ->
-                Log.i(TAG, "Received shared audio Uri: $uri")
-                viewModel.handleSharedAudioUri(uri)
-            } ?: Log.e(TAG, "Shared intent audio Uri was null")
+            if (audioUri != null) {
+                Log.i(TAG, "Successfully extracted shared audio Uri: $audioUri")
+                Toast.makeText(this, "Áudio recebido! Processando...", Toast.LENGTH_SHORT).show()
+                viewModel.handleSharedAudioUri(audioUri)
+            } else {
+                Log.w(TAG, "Received share intent ($action) but no valid audio Uri was extracted.")
+            }
         }
+    }
+
+    private fun extractAudioUri(intent: Intent): Uri? {
+        // 1. Try EXTRA_STREAM (Single)
+        val extraStreamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+        }
+        if (extraStreamUri != null) return extraStreamUri
+
+        // 2. Try ClipData
+        val clipData = intent.clipData
+        if (clipData != null && clipData.itemCount > 0) {
+            val itemUri = clipData.getItemAt(0).uri
+            if (itemUri != null) return itemUri
+        }
+
+        // 3. Try intent.data
+        if (intent.data != null) return intent.data
+
+        // 4. Try EXTRA_STREAM (Multiple list fallback)
+        val multipleUris = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+        }
+        if (!multipleUris.isNullOrEmpty()) {
+            return multipleUris[0]
+        }
+
+        return null
     }
 
     companion object {
