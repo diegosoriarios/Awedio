@@ -39,8 +39,10 @@ jobs:
           distribution: 'zulu'
           cache: 'gradle'
 
-      - name: Setup Android NDK & SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses & Setup NDK
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "cmake;3.22.1" || true
 
       - name: Decode Release Keystore
         env:
