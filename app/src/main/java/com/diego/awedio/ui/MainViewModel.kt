@@ -15,22 +15,29 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val db = AppDatabase.getDatabase(application)
-    private val dao = db.transcriptionDao()
-    private val whisperLib = WhisperLib()
+    private val db by lazy { AppDatabase.getDatabase(getApplication()) }
+    private val dao by lazy { db.transcriptionDao() }
+    private val whisperLib by lazy { WhisperLib() }
 
-    val transcriptions: StateFlow<List<TranscriptionEntity>> = dao.getAllTranscriptions()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    val transcriptions: StateFlow<List<TranscriptionEntity>> by lazy {
+        dao.getAllTranscriptions()
+            .catch { e ->
+                Log.e(TAG, "Error querying transcriptions database: ${e.message}", e)
+                emit(emptyList())
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+    }
 
     private val _selectedTranscription = MutableStateFlow<TranscriptionEntity?>(null)
     val selectedTranscription: StateFlow<TranscriptionEntity?> = _selectedTranscription.asStateFlow()
@@ -60,8 +67,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun checkModelStatus() {
-        val downloaded = ModelManager.isModelDownloaded(getApplication())
-        _isModelDownloaded.value = downloaded
+        try {
+            val downloaded = ModelManager.isModelDownloaded(getApplication())
+            _isModelDownloaded.value = downloaded
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking model status: ${e.message}", e)
+        }
     }
 
     fun downloadModel() {
@@ -84,7 +95,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _statusMessage.value = "Whisper model downloaded successfully!"
                         _showModelMissingDialog.value = false
 
-                        // Resume pending audio transcription if user was trying to share
                         pendingAudioUri?.let { uri ->
                             pendingAudioUri = null
                             processAudioUri(uri)
@@ -133,7 +143,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val modelFile = ModelManager.getModelFile(context)
                     val ctxPtr = whisperLib.initContext(modelFile.absolutePath)
                     if (ctxPtr == 0L) {
-                        Log.e("MainViewModel", "Failed to init whisper context")
+                        Log.e(TAG, "Failed to init whisper context")
                         return@withContext "Error: Failed to initialize whisper model."
                     }
 
@@ -142,7 +152,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     whisperLib.freeContext(ctxPtr)
                     result
                 } catch (e: Exception) {
-                    Log.e("MainViewModel", "Transcription error: ${e.message}", e)
+                    Log.e(TAG, "Transcription error: ${e.message}", e)
                     "Error transcribing audio: ${e.message}"
                 }
             }
@@ -157,11 +167,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 durationSeconds = if (durationSeconds > 0) durationSeconds.toInt() else null
             )
 
-            val id = dao.insertTranscription(entity)
-            val newEntity = entity.copy(id = id)
-
-            _selectedTranscription.value = newEntity
-            _statusMessage.value = "Transcription completed!"
+            try {
+                val id = dao.insertTranscription(entity)
+                val newEntity = entity.copy(id = id)
+                _selectedTranscription.value = newEntity
+                _statusMessage.value = "Transcription completed!"
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving transcription to Room: ${e.message}", e)
+            }
         }
     }
 
@@ -171,17 +184,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteTranscription(entity: TranscriptionEntity) {
         viewModelScope.launch {
-            dao.deleteTranscription(entity)
-            if (_selectedTranscription.value?.id == entity.id) {
-                _selectedTranscription.value = null
+            try {
+                dao.deleteTranscription(entity)
+                if (_selectedTranscription.value?.id == entity.id) {
+                    _selectedTranscription.value = null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting transcription: ${e.message}", e)
             }
         }
     }
 
     fun clearHistory() {
         viewModelScope.launch {
-            dao.clearAll()
-            _selectedTranscription.value = null
+            try {
+                dao.clearAll()
+                _selectedTranscription.value = null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing history: ${e.message}", e)
+            }
         }
     }
 
@@ -191,5 +212,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearStatusMessage() {
         _statusMessage.value = null
+    }
+
+    companion object {
+        private const val TAG = "MainViewModel"
     }
 }
