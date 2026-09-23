@@ -1,7 +1,7 @@
 package com.diego.awedio.model
 
 import android.content.Context
-import android.util.Log
+import com.diego.awedio.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -24,8 +24,9 @@ object ModelManager {
 
     fun isModelDownloaded(context: Context): Boolean {
         val file = getModelFile(context)
-        // ggml-base.bin is ~142MB (approx 147,964,211 bytes)
-        return file.exists() && file.length() > 100_000_000L
+        val exists = file.exists() && file.length() > 100_000_000L
+        AppLogger.i(TAG, "isModelDownloaded check: $exists (${file.length()} bytes at ${file.absolutePath})")
+        return exists
     }
 
     suspend fun downloadModel(
@@ -37,12 +38,11 @@ object ModelManager {
         val tempFile = File(targetFile.parentFile, "$MODEL_FILENAME.tmp")
 
         try {
-            Log.i(TAG, "Starting download of whisper model from $MODEL_URL")
+            AppLogger.i(TAG, "Starting download of whisper base model from $MODEL_URL")
             var currentUrl = MODEL_URL
             var connection: HttpURLConnection? = null
             var redirects = 0
 
-            // Handle HTTP 301/302 redirects from Hugging Face CDN
             while (redirects < 5) {
                 val url = URL(currentUrl)
                 connection = url.openConnection() as HttpURLConnection
@@ -64,56 +64,50 @@ object ModelManager {
 
             if (connection == null || connection.responseCode != HttpURLConnection.HTTP_OK) {
                 val responseMsg = connection?.responseMessage ?: "Unknown error"
-                Log.e(TAG, "HTTP error during model download: ${connection?.responseCode} - $responseMsg")
-                onResult(false, "Download failed with HTTP ${connection?.responseCode}: $responseMsg")
+                AppLogger.e(TAG, "HTTP error during model download: ${connection?.responseCode} - $responseMsg")
+                onResult(false, "HTTP ${connection?.responseCode}: $responseMsg")
                 return@withContext
             }
 
             val contentLength = connection.contentLengthLong
-            Log.i(TAG, "Downloading whisper base model. Size: $contentLength bytes")
+            AppLogger.i(TAG, "Downloading whisper base model. Expected size: $contentLength bytes")
 
             connection.inputStream.use { input ->
                 FileOutputStream(tempFile).use { output ->
                     val buffer = ByteArray(32 * 1024)
                     var bytesRead: Int
-                    var totalBytesDownloaded: Long = 0
+                    var totalDownloaded: Long = 0
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
-                        totalBytesDownloaded += bytesRead
+                        totalDownloaded += bytesRead
 
                         if (contentLength > 0) {
-                            val progress = totalBytesDownloaded.toFloat() / contentLength.toFloat()
-                            withContext(Dispatchers.Main) {
-                                onProgress(progress)
-                            }
+                            val progress = totalDownloaded.toFloat() / contentLength.toFloat()
+                            withContext(Dispatchers.Main) { onProgress(progress) }
                         }
                     }
                 }
             }
 
             if (tempFile.exists() && tempFile.length() > 100_000_000L) {
-                if (targetFile.exists()) {
-                    targetFile.delete()
-                }
+                if (targetFile.exists()) targetFile.delete()
                 tempFile.renameTo(targetFile)
-                Log.i(TAG, "Whisper model downloaded successfully to ${targetFile.absolutePath}")
+                AppLogger.i(TAG, "Model downloaded successfully to ${targetFile.absolutePath}")
                 withContext(Dispatchers.Main) {
                     onProgress(1.0f)
                     onResult(true, null)
                 }
             } else {
-                Log.e(TAG, "Downloaded file incomplete (${tempFile.length()} bytes)")
+                AppLogger.e(TAG, "Downloaded file incomplete (${tempFile.length()} bytes)")
                 tempFile.delete()
                 withContext(Dispatchers.Main) {
                     onResult(false, "Downloaded file is incomplete.")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error downloading model: ${e.message}", e)
-            if (tempFile.exists()) {
-                tempFile.delete()
-            }
+            AppLogger.e(TAG, "Error downloading model: ${e.message}", e)
+            if (tempFile.exists()) tempFile.delete()
             withContext(Dispatchers.Main) {
                 onResult(false, e.message ?: "Network error downloading model")
             }

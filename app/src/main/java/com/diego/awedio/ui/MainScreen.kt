@@ -3,6 +3,7 @@ package com.diego.awedio.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -39,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -46,16 +51,27 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.diego.awedio.data.TranscriptionEntity
+import com.diego.awedio.util.AppLogger
+import com.diego.awedio.util.LogEntry
+import com.diego.awedio.util.LogLevel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,6 +88,8 @@ fun MainScreen(viewModel: MainViewModel) {
     val isTranscribing by viewModel.isTranscribing.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val showModelMissingDialog by viewModel.showModelMissingDialog.collectAsState()
+
+    var showLogSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -94,6 +112,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     containerColor = MaterialTheme.colorScheme.surfaceContainer
                 ),
                 actions = {
+                    IconButton(onClick = { showLogSheet = true }) {
+                        Icon(
+                            imageVector = Icons.Default.BugReport,
+                            contentDescription = "Logs de Sistema"
+                        )
+                    }
                     if (transcriptions.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearHistory() }) {
                             Icon(
@@ -214,7 +238,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(transcriptions, key = { it.id }) { item ->
+                    items(items = transcriptions, key = { item -> item.id }) { item ->
                         TranscriptionCard(
                             item = item,
                             onClick = { viewModel.selectTranscription(item) },
@@ -261,6 +285,150 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
             }
         )
+    }
+
+    // Log Viewer Bottom Sheet
+    if (showLogSheet) {
+        LogViewerSheet(
+            onDismiss = { showLogSheet = false },
+            onCopyLogs = {
+                val logsText = AppLogger.getAllLogsText()
+                copyToClipboard(context, if (logsText.isBlank()) "Sem logs registrados." else logsText)
+            },
+            onShareLogs = {
+                try {
+                    val logFile = AppLogger.getLogFile()
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Awedio - Logs do Sistema")
+                        if (logFile != null && logFile.exists() && logFile.length() > 0) {
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                logFile
+                            )
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            clipData = ClipData.newRawUri("Awedio Logs", uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        } else {
+                            putExtra(
+                                Intent.EXTRA_TEXT,
+                                AppLogger.getAllLogsText().ifBlank { "Sem logs registrados." }
+                            )
+                        }
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "Compartilhar Logs"))
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Erro ao compartilhar logs: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onClearLogs = { AppLogger.clear() }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LogViewerSheet(
+    onDismiss: () -> Unit,
+    onCopyLogs: () -> Unit,
+    onShareLogs: () -> Unit,
+    onClearLogs: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val logs by AppLogger.logs.collectAsState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = Modifier.fillMaxHeight(0.85f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Logs do Sistema",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${logs.size} linha(s) de registro",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+
+                Row {
+                    IconButton(onClick = onShareLogs) {
+                        Icon(imageVector = Icons.Default.Share, contentDescription = "Compartilhar Logs")
+                    }
+                    IconButton(onClick = onCopyLogs) {
+                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copiar Logs")
+                    }
+                    IconButton(onClick = onClearLogs) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Limpar Logs")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = Color(0xFF1E1E1E)
+            ) {
+                if (logs.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Nenhum log registrado ainda.",
+                            color = Color.Gray,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(items = logs, key = { log -> log.id }) { log ->
+                            val textColor = when (log.level) {
+                                LogLevel.INFO -> Color(0xFFD4D4D4)
+                                LogLevel.WARN -> Color(0xFFFFCC00)
+                                LogLevel.ERROR -> Color(0xFFFF5555)
+                            }
+
+                            Text(
+                                text = log.formattedText(),
+                                color = textColor,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "Fechar Logs")
+            }
+        }
     }
 }
 
