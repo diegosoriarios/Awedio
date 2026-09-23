@@ -11,35 +11,52 @@ import java.net.URL
 
 object ModelManager {
     private const val TAG = "ModelManager"
-    private const val MODEL_FILENAME = "ggml-base.bin"
-    const val MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
 
-    fun getModelFile(context: Context): File {
+    private const val SIZE_TOLERANCE = 0.98f
+
+    fun getModelFile(context: Context, model: WhisperModelDef): File {
         val modelsDir = File(context.filesDir, "models")
         if (!modelsDir.exists()) {
             modelsDir.mkdirs()
         }
-        return File(modelsDir, MODEL_FILENAME)
+        return File(modelsDir, model.fileName)
     }
 
-    fun isModelDownloaded(context: Context): Boolean {
-        val file = getModelFile(context)
-        val exists = file.exists() && file.length() > 100_000_000L
-        AppLogger.i(TAG, "isModelDownloaded check: $exists (${file.length()} bytes at ${file.absolutePath})")
+    fun isModelDownloaded(context: Context, model: WhisperModelDef): Boolean {
+        val file = getModelFile(context, model)
+        val minBytes = (model.sizeBytes * SIZE_TOLERANCE).toLong()
+        val exists = file.exists() && file.length() >= minBytes
+        AppLogger.i(TAG, "isModelDownloaded check [$model.id]: $exists (${file.length()} bytes, expected >= $minBytes at ${file.absolutePath})")
         return exists
+    }
+
+    fun getDownloadStatusMap(context: Context): Map<String, Boolean> {
+        return WhisperModels.ALL.associate { it.id to isModelDownloaded(context, it) }
+    }
+
+    fun deleteModel(context: Context, model: WhisperModelDef): Boolean {
+        val file = getModelFile(context, model)
+        return if (file.exists() && file.delete()) {
+            AppLogger.i(TAG, "Model [$model.id] deleted from ${file.absolutePath}")
+            true
+        } else {
+            AppLogger.e(TAG, "Failed to delete model [$model.id] at ${file.absolutePath}")
+            false
+        }
     }
 
     suspend fun downloadModel(
         context: Context,
+        model: WhisperModelDef,
         onProgress: (Float) -> Unit,
         onResult: (Boolean, String?) -> Unit
     ) = withContext(Dispatchers.IO) {
-        val targetFile = getModelFile(context)
-        val tempFile = File(targetFile.parentFile, "$MODEL_FILENAME.tmp")
+        val targetFile = getModelFile(context, model)
+        val tempFile = File(targetFile.parentFile, "${model.fileName}.tmp")
 
         try {
-            AppLogger.i(TAG, "Starting download of whisper base model from $MODEL_URL")
-            var currentUrl = MODEL_URL
+            AppLogger.i(TAG, "Starting download of [${model.id}] from ${model.url}")
+            var currentUrl = model.url
             var connection: HttpURLConnection? = null
             var redirects = 0
 
@@ -70,7 +87,7 @@ object ModelManager {
             }
 
             val contentLength = connection.contentLengthLong
-            AppLogger.i(TAG, "Downloading whisper base model. Expected size: $contentLength bytes")
+            AppLogger.i(TAG, "Downloading [${model.id}]. Expected size: $contentLength bytes")
 
             connection.inputStream.use { input ->
                 FileOutputStream(tempFile).use { output ->
@@ -90,19 +107,20 @@ object ModelManager {
                 }
             }
 
-            if (tempFile.exists() && tempFile.length() > 100_000_000L) {
+            val minBytes = (model.sizeBytes * SIZE_TOLERANCE).toLong()
+            if (tempFile.exists() && tempFile.length() >= minBytes) {
                 if (targetFile.exists()) targetFile.delete()
                 tempFile.renameTo(targetFile)
-                AppLogger.i(TAG, "Model downloaded successfully to ${targetFile.absolutePath}")
+                AppLogger.i(TAG, "Model [${model.id}] downloaded successfully to ${targetFile.absolutePath}")
                 withContext(Dispatchers.Main) {
                     onProgress(1.0f)
                     onResult(true, null)
                 }
             } else {
-                AppLogger.e(TAG, "Downloaded file incomplete (${tempFile.length()} bytes)")
+                AppLogger.e(TAG, "Downloaded file incomplete (${tempFile.length()} bytes, expected >= $minBytes)")
                 tempFile.delete()
                 withContext(Dispatchers.Main) {
-                    onResult(false, "Downloaded file is incomplete.")
+                    onResult(false, "Arquivo baixado incompleto (${tempFile.length()} bytes).")
                 }
             }
         } catch (e: Exception) {

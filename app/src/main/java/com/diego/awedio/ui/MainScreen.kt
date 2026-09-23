@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -69,6 +70,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.diego.awedio.data.TranscriptionEntity
+import com.diego.awedio.model.WhisperModelDef
+import com.diego.awedio.model.WhisperModels
 import com.diego.awedio.util.AppLogger
 import com.diego.awedio.util.LogEntry
 import com.diego.awedio.util.LogLevel
@@ -85,11 +88,15 @@ fun MainScreen(viewModel: MainViewModel) {
     val isModelDownloaded by viewModel.isModelDownloaded.collectAsState()
     val isDownloadingModel by viewModel.isDownloadingModel.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
+    val selectedModel by viewModel.selectedModel.collectAsState()
+    val availableModels by viewModel.availableModels.collectAsState()
+    val modelDownloadStatus by viewModel.modelDownloadStatus.collectAsState()
     val isTranscribing by viewModel.isTranscribing.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val showModelMissingDialog by viewModel.showModelMissingDialog.collectAsState()
 
     var showLogSheet by remember { mutableStateOf(false) }
+    var showModelPicker by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -138,9 +145,11 @@ fun MainScreen(viewModel: MainViewModel) {
         ) {
             // Model Status Banner / Downloader
             ModelStatusCard(
+                selectedModel = selectedModel,
                 isModelDownloaded = isModelDownloaded,
                 isDownloading = isDownloadingModel,
                 progress = downloadProgress,
+                onClick = { showModelPicker = true },
                 onDownloadClick = { viewModel.downloadModel() }
             )
 
@@ -271,7 +280,7 @@ fun MainScreen(viewModel: MainViewModel) {
             title = { Text(text = "Modelo Whisper Necessário") },
             text = {
                 Text(
-                    text = "Para transcrever áudios offline, você precisa baixar o modelo Whisper base (~142MB) uma única vez. Deseja baixar agora?"
+                    text = "Para transcrever áudios offline, você precisa baixar o modelo ${selectedModel.displayName} (${selectedModel.sizeLabel}) uma única vez. Deseja baixar agora?"
                 )
             },
             confirmButton = {
@@ -284,6 +293,28 @@ fun MainScreen(viewModel: MainViewModel) {
                     Text(text = "Cancelar")
                 }
             }
+        )
+    }
+
+    // Model Picker Bottom Sheet
+    if (showModelPicker) {
+        ModelPickerSheet(
+            models = availableModels,
+            selectedModelId = selectedModel.id,
+            downloadStatus = modelDownloadStatus,
+            isDownloading = isDownloadingModel,
+            downloadingModelId = if (isDownloadingModel) selectedModel.id else null,
+            downloadProgress = downloadProgress,
+            onSelectModel = { model ->
+                viewModel.selectModel(model)
+            },
+            onDownloadModel = {
+                viewModel.downloadModel()
+            },
+            onDeleteModel = { model ->
+                viewModel.deleteModel(model)
+            },
+            onDismiss = { showModelPicker = false }
         )
     }
 
@@ -434,13 +465,17 @@ fun LogViewerSheet(
 
 @Composable
 fun ModelStatusCard(
+    selectedModel: WhisperModelDef,
     isModelDownloaded: Boolean,
     isDownloading: Boolean,
     progress: Float,
+    onClick: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = if (isModelDownloaded)
                 MaterialTheme.colorScheme.secondaryContainer
@@ -464,12 +499,18 @@ fun ModelStatusCard(
                     )
                     Text(
                         text = if (isModelDownloaded)
-                            "ggml-base.bin instalado • Transcrição em Português"
+                            "${selectedModel.displayName} • ${selectedModel.sizeLabel} • Transcrição em Português"
                         else
-                            "Requer download de ~142MB do Hugging Face",
+                            "${selectedModel.displayName} • Requer download de ${selectedModel.sizeLabel}",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+                Text(
+                    text = "Trocar",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             if (isDownloading) {
@@ -480,7 +521,7 @@ fun ModelStatusCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Baixando modelo: ${(progress * 100).toInt()}%",
+                    text = "Baixando ${selectedModel.displayName}: ${(progress * 100).toInt()}%",
                     style = MaterialTheme.typography.labelSmall
                 )
             } else if (!isModelDownloaded) {
@@ -491,7 +532,205 @@ fun ModelStatusCard(
                 ) {
                     Icon(imageVector = Icons.Default.Download, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Baixar Modelo Base (~142MB)")
+                    Text(text = "Baixar ${selectedModel.displayName} (${selectedModel.sizeLabel})")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModelPickerSheet(
+    models: List<WhisperModelDef>,
+    selectedModelId: String,
+    downloadStatus: Map<String, Boolean>,
+    isDownloading: Boolean,
+    downloadingModelId: String?,
+    downloadProgress: Float,
+    onSelectModel: (WhisperModelDef) -> Unit,
+    onDownloadModel: () -> Unit,
+    onDeleteModel: (WhisperModelDef) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "Escolher Modelo Whisper",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Todos funcionam offline em Português. Modelos maiores são mais precisos, porém mais lentos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            models.forEach { model ->
+                ModelPickerItem(
+                    model = model,
+                    isSelected = model.id == selectedModelId,
+                    isDownloaded = downloadStatus[model.id] == true,
+                    isDownloadingThis = isDownloading && downloadingModelId == model.id,
+                    isAnyDownloading = isDownloading,
+                    downloadProgress = downloadProgress,
+                    onSelectModel = onSelectModel,
+                    onDownloadModel = onDownloadModel,
+                    onDeleteModel = onDeleteModel
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+fun ModelPickerItem(
+    model: WhisperModelDef,
+    isSelected: Boolean,
+    isDownloaded: Boolean,
+    isDownloadingThis: Boolean,
+    isAnyDownloading: Boolean,
+    downloadProgress: Float,
+    onSelectModel: (WhisperModelDef) -> Unit,
+    onDownloadModel: () -> Unit,
+    onDeleteModel: (WhisperModelDef) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected)
+                MaterialTheme.colorScheme.secondaryContainer
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = when {
+                    isDownloadingThis -> Icons.Default.Download
+                    isDownloaded -> Icons.Default.CheckCircle
+                    else -> Icons.Default.Download
+                },
+                contentDescription = null,
+                tint = when {
+                    isDownloadingThis -> MaterialTheme.colorScheme.tertiary
+                    isDownloaded -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.outline
+                }
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = model.displayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (model.recommended) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(11.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = "Recomendado",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    if (isSelected) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Text(
+                                text = "Em uso",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = "${model.sizeLabel} • Velocidade: ${model.speedLabel} • RAM mín.: ${model.minRamGb}GB",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (isDownloadingThis) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { downloadProgress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = "Baixando: ${(downloadProgress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+
+            if (isDownloadingThis) {
+                // Download in progress: no actions
+            } else if (isDownloaded) {
+                if (!isSelected) {
+                    TextButton(onClick = { onSelectModel(model) }) {
+                        Text(text = "Usar")
+                    }
+                    IconButton(onClick = { onDeleteModel(model) }) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Excluir modelo",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            } else if (!isAnyDownloading) {
+                TextButton(onClick = {
+                    onSelectModel(model)
+                    onDownloadModel()
+                }) {
+                    Icon(imageVector = Icons.Default.Download, contentDescription = null)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Baixar")
                 }
             }
         }
