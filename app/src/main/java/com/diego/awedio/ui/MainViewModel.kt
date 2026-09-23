@@ -129,7 +129,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun processAudioUri(uri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isTranscribing.value = true
             _statusMessage.value = "Acessando nota de voz compartilhada..."
             AppLogger.i(TAG, "Starting audio processing pipeline for Uri: $uri")
@@ -207,7 +207,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 refreshTranscriptions()
             } catch (e: Exception) {
                 AppLogger.e(TAG, "Error saving transcription to Room: ${e.message}", e)
-                _statusMessage.value = "Transcrição concluída!"
+                _statusMessage.value = "Erro ao salvar a transcrição: ${e.message}"
             }
         }
     }
