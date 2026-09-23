@@ -15,6 +15,9 @@ public interface TranscriptionDao {
     @Query("SELECT * FROM transcriptions ORDER BY timestamp DESC")
     Flow<List<TranscriptionEntity>> getAllTranscriptions();
 
+    @Query("SELECT * FROM transcriptions ORDER BY timestamp DESC")
+    List<TranscriptionEntity> getTranscriptionsList();
+
     @Query("SELECT * FROM transcriptions WHERE id = :id LIMIT 1")
     TranscriptionEntity getTranscriptionById(long id);
 

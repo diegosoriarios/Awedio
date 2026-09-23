@@ -12,11 +12,8 @@ import com.diego.awedio.model.ModelManager
 import com.diego.awedio.whisper.WhisperLib
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -26,18 +23,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val dao by lazy { db.transcriptionDao() }
     private val whisperLib by lazy { WhisperLib() }
 
-    val transcriptions: StateFlow<List<TranscriptionEntity>> by lazy {
-        dao.getAllTranscriptions()
-            .catch { e ->
-                Log.e(TAG, "Error querying transcriptions database: ${e.message}", e)
-                emit(emptyList())
-            }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
-    }
+    private val _transcriptionsList = MutableStateFlow<List<TranscriptionEntity>>(emptyList())
+    val transcriptions: StateFlow<List<TranscriptionEntity>> = _transcriptionsList.asStateFlow()
 
     private val _selectedTranscription = MutableStateFlow<TranscriptionEntity?>(null)
     val selectedTranscription: StateFlow<TranscriptionEntity?> = _selectedTranscription.asStateFlow()
@@ -64,6 +51,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         checkModelStatus()
+        refreshTranscriptions()
+    }
+
+    fun refreshTranscriptions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val list = dao.transcriptionsList
+                Log.i(TAG, "Fetched ${list?.size ?: 0} transcriptions from Room database.")
+                _transcriptionsList.value = list ?: emptyList()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching transcriptions list from Room: ${e.message}", e)
+            }
+        }
     }
 
     fun checkModelStatus() {
@@ -165,10 +165,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             _isTranscribing.value = false
 
+            val textToSave = if (transcribedText.isBlank()) {
+                "Áudio processado (nenhuma fala detectada)."
+            } else {
+                transcribedText
+            }
+
             val durationSeconds = (wavFile.length() - 44) / (16000 * 2)
             val entity = TranscriptionEntity(
                 timestamp = System.currentTimeMillis(),
-                transcribedText = transcribedText,
+                transcribedText = textToSave,
                 audioFilename = copiedFile.name,
                 durationSeconds = if (durationSeconds > 0) durationSeconds.toInt() else null
             )
@@ -178,6 +184,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val newEntity = entity.copy(id = id)
                 _selectedTranscription.value = newEntity
                 _statusMessage.value = "Transcrição concluída com sucesso!"
+                refreshTranscriptions()
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving transcription to Room: ${e.message}", e)
                 _statusMessage.value = "Transcrição concluída!"
@@ -190,12 +197,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteTranscription(entity: TranscriptionEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 dao.deleteTranscription(entity)
                 if (_selectedTranscription.value?.id == entity.id) {
                     _selectedTranscription.value = null
                 }
+                refreshTranscriptions()
             } catch (e: Exception) {
                 Log.e(TAG, "Error deleting transcription: ${e.message}", e)
             }
@@ -203,10 +211,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearHistory() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 dao.clearAll()
                 _selectedTranscription.value = null
+                refreshTranscriptions()
             } catch (e: Exception) {
                 Log.e(TAG, "Error clearing history: ${e.message}", e)
             }
