@@ -1,3 +1,5 @@
+<p align="center"><img src="icon.webp" width="128" alt="Awedio icon"></p>
+
 # awedio
 
 Offline, on-device **speech-to-text for Android** powered by [whisper.cpp](https://github.com/ggml-org/whisper.cpp).
