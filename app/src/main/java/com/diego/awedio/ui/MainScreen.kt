@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -119,12 +118,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     containerColor = MaterialTheme.colorScheme.surfaceContainer
                 ),
                 actions = {
-                    IconButton(onClick = { showLogSheet = true }) {
-                        Icon(
-                            imageVector = Icons.Default.BugReport,
-                            contentDescription = "Logs de Sistema"
-                        )
-                    }
                     if (transcriptions.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearHistory() }) {
                             Icon(
