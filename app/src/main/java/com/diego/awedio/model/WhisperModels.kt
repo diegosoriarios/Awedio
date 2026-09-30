@@ -1,12 +1,15 @@
 package com.diego.awedio.model
 
+import androidx.annotation.StringRes
+import com.diego.awedio.R
+
 data class WhisperModelDef(
     val id: String,
     val displayName: String,
     val fileName: String,
     val url: String,
     val sizeBytes: Long,
-    val speedLabel: String,
+    @StringRes val speedLabelRes: Int,
     val minRamGb: Int,
     val recommended: Boolean = false
 ) {
@@ -32,7 +35,7 @@ object WhisperModels {
         fileName = "ggml-base.bin",
         url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
         sizeBytes = 147_951_465L,
-        speedLabel = "Rápido",
+        speedLabelRes = R.string.speed_fast,
         minRamGb = 1
     )
 
@@ -42,7 +45,7 @@ object WhisperModels {
         fileName = "ggml-small-q5_1.bin",
         url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin",
         sizeBytes = 190_085_487L,
-        speedLabel = "Médio",
+        speedLabelRes = R.string.speed_medium,
         minRamGb = 2
     )
 
@@ -52,7 +55,7 @@ object WhisperModels {
         fileName = "ggml-large-v3-turbo-q5_0.bin",
         url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
         sizeBytes = 574_041_195L,
-        speedLabel = "Bom",
+        speedLabelRes = R.string.speed_good,
         minRamGb = 3,
         recommended = true
     )
@@ -63,7 +66,7 @@ object WhisperModels {
         fileName = "ggml-large-v3-q5_0.bin",
         url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin",
         sizeBytes = 1_081_140_203L,
-        speedLabel = "Muito lento",
+        speedLabelRes = R.string.speed_very_slow,
         minRamGb = 4
     )
 

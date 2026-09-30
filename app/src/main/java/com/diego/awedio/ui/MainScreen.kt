@@ -6,10 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -39,6 +42,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -62,13 +67,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.diego.awedio.R
 import com.diego.awedio.data.TranscriptionEntity
+import com.diego.awedio.model.TranscriptionLanguage
 import com.diego.awedio.model.WhisperModelDef
 import com.diego.awedio.model.WhisperModels
 import com.diego.awedio.util.AppLogger
@@ -93,9 +101,11 @@ fun MainScreen(viewModel: MainViewModel) {
     val isTranscribing by viewModel.isTranscribing.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val showModelMissingDialog by viewModel.showModelMissingDialog.collectAsState()
+    val transcriptionLanguage by viewModel.transcriptionLanguage.collectAsState()
 
     var showLogSheet by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
+    val copiedMessage = stringResource(R.string.msg_copied)
 
     Scaffold(
         topBar = {
@@ -103,12 +113,12 @@ fun MainScreen(viewModel: MainViewModel) {
                 title = {
                     Column {
                         Text(
-                            text = "Awedio",
+                            text = stringResource(R.string.app_title),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleLarge
                         )
                         Text(
-                            text = "Transcritor Offline de Notas de Voz",
+                            text = stringResource(R.string.subtitle),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -122,7 +132,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         IconButton(onClick = { viewModel.clearHistory() }) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "Limpar Histórico"
+                                contentDescription = stringResource(R.string.clear_history_cd)
                             )
                         }
                     }
@@ -142,6 +152,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 isModelDownloaded = isModelDownloaded,
                 isDownloading = isDownloadingModel,
                 progress = downloadProgress,
+                languageLabel = stringResource(transcriptionLanguage.labelRes),
                 onClick = { showModelPicker = true },
                 onDownloadClick = { viewModel.downloadModel() }
             )
@@ -150,10 +161,11 @@ fun MainScreen(viewModel: MainViewModel) {
 
             // Status Message / Active Processing Banner
             statusMessage?.let { msg ->
+                val statusText = stringResource(msg.resId, *msg.args.toTypedArray())
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isTranscribing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 ) {
                     Row(
@@ -175,11 +187,11 @@ fun MainScreen(viewModel: MainViewModel) {
                                 Icon(imageVector = Icons.Default.Info, contentDescription = null)
                                 Spacer(modifier = Modifier.width(10.dp))
                             }
-                            Text(text = msg, style = MaterialTheme.typography.bodyMedium)
+                            Text(text = statusText, style = MaterialTheme.typography.bodyMedium)
                         }
                         if (!isTranscribing) {
                             IconButton(onClick = { viewModel.clearStatusMessage() }) {
-                                Icon(imageVector = Icons.Default.Close, contentDescription = "Fechar")
+                                Icon(imageVector = Icons.Default.Close, contentDescription = stringResource(R.string.close))
                             }
                         }
                     }
@@ -193,12 +205,12 @@ fun MainScreen(viewModel: MainViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Histórico de Transcrições",
+                    text = stringResource(R.string.history_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${transcriptions.size} item(s)",
+                    text = stringResource(R.string.history_count, transcriptions.size),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -223,13 +235,13 @@ fun MainScreen(viewModel: MainViewModel) {
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Nenhuma transcrição ainda.",
+                            text = stringResource(R.string.empty_history_title),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.outline
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Compartilhe um áudio do WhatsApp com o Awedio!",
+                            text = stringResource(R.string.empty_history_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -245,7 +257,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             item = item,
                             onClick = { viewModel.selectTranscription(item) },
                             onCopyClick = {
-                                copyToClipboard(context, item.transcribedText)
+                                copyToClipboard(context, item.transcribedText, copiedMessage)
                             },
                             onDeleteClick = {
                                 viewModel.deleteTranscription(item)
@@ -262,7 +274,7 @@ fun MainScreen(viewModel: MainViewModel) {
         TranscriptionDetailDialog(
             entity = entity,
             onDismiss = { viewModel.selectTranscription(null) },
-            onCopyClick = { copyToClipboard(context, entity.transcribedText) }
+            onCopyClick = { copyToClipboard(context, entity.transcribedText, copiedMessage) }
         )
     }
 
@@ -270,20 +282,24 @@ fun MainScreen(viewModel: MainViewModel) {
     if (showModelMissingDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissModelDialog() },
-            title = { Text(text = "Modelo Whisper Necessário") },
+            title = { Text(text = stringResource(R.string.dialog_model_required_title)) },
             text = {
                 Text(
-                    text = "Para transcrever áudios offline, você precisa baixar o modelo ${selectedModel.displayName} (${selectedModel.sizeLabel}) uma única vez. Deseja baixar agora?"
+                    text = stringResource(
+                        R.string.dialog_model_required_body,
+                        selectedModel.displayName,
+                        selectedModel.sizeLabel
+                    )
                 )
             },
             confirmButton = {
                 Button(onClick = { viewModel.downloadModel() }) {
-                    Text(text = "Baixar Modelo")
+                    Text(text = stringResource(R.string.download_model))
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { viewModel.dismissModelDialog() }) {
-                    Text(text = "Cancelar")
+                    Text(text = stringResource(R.string.cancel))
                 }
             }
         )
@@ -298,8 +314,12 @@ fun MainScreen(viewModel: MainViewModel) {
             isDownloading = isDownloadingModel,
             downloadingModelId = if (isDownloadingModel) selectedModel.id else null,
             downloadProgress = downloadProgress,
+            selectedLanguage = transcriptionLanguage,
             onSelectModel = { model ->
                 viewModel.selectModel(model)
+            },
+            onSelectLanguage = { language ->
+                viewModel.setTranscriptionLanguage(language)
             },
             onDownloadModel = {
                 viewModel.downloadModel()
@@ -312,19 +332,25 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     // Log Viewer Bottom Sheet
+    val noLogsText = stringResource(R.string.no_logs)
+    val logShareSubject = stringResource(R.string.log_share_subject)
+    val logClipLabel = stringResource(R.string.log_clip_label)
+    val shareLogsTitle = stringResource(R.string.share_logs)
+    val shareLogsError = stringResource(R.string.err_share_logs)
+
     if (showLogSheet) {
         LogViewerSheet(
             onDismiss = { showLogSheet = false },
             onCopyLogs = {
                 val logsText = AppLogger.getAllLogsText()
-                copyToClipboard(context, if (logsText.isBlank()) "Sem logs registrados." else logsText)
+                copyToClipboard(context, if (logsText.isBlank()) noLogsText else logsText, copiedMessage)
             },
             onShareLogs = {
                 try {
                     val logFile = AppLogger.getLogFile()
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
-                        putExtra(Intent.EXTRA_SUBJECT, "Awedio - Logs do Sistema")
+                        putExtra(Intent.EXTRA_SUBJECT, logShareSubject)
                         if (logFile != null && logFile.exists() && logFile.length() > 0) {
                             val uri = FileProvider.getUriForFile(
                                 context,
@@ -332,18 +358,19 @@ fun MainScreen(viewModel: MainViewModel) {
                                 logFile
                             )
                             putExtra(Intent.EXTRA_STREAM, uri)
-                            clipData = ClipData.newRawUri("Awedio Logs", uri)
+                            clipData = ClipData.newRawUri(logClipLabel, uri)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         } else {
                             putExtra(
                                 Intent.EXTRA_TEXT,
-                                AppLogger.getAllLogsText().ifBlank { "Sem logs registrados." }
+                                AppLogger.getAllLogsText().ifBlank { noLogsText }
                             )
                         }
                     }
-                    context.startActivity(Intent.createChooser(shareIntent, "Compartilhar Logs"))
+                    context.startActivity(Intent.createChooser(shareIntent, shareLogsTitle))
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Erro ao compartilhar logs: ${e.message}", Toast.LENGTH_SHORT).show()
+                    AppLogger.e("MainScreen", "Error sharing logs: ${e.message}", e)
+                    Toast.makeText(context, shareLogsError, Toast.LENGTH_SHORT).show()
                 }
             },
             onClearLogs = { AppLogger.clear() }
@@ -379,12 +406,12 @@ fun LogViewerSheet(
             ) {
                 Column {
                     Text(
-                        text = "Logs do Sistema",
+                        text = stringResource(R.string.logs_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${logs.size} linha(s) de registro",
+                        text = stringResource(R.string.log_count, logs.size),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -392,13 +419,13 @@ fun LogViewerSheet(
 
                 Row {
                     IconButton(onClick = onShareLogs) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "Compartilhar Logs")
+                        Icon(imageVector = Icons.Default.Share, contentDescription = stringResource(R.string.share_logs))
                     }
                     IconButton(onClick = onCopyLogs) {
-                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copiar Logs")
+                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy_logs_cd))
                     }
                     IconButton(onClick = onClearLogs) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Limpar Logs")
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = stringResource(R.string.clear_logs_cd))
                     }
                 }
             }
@@ -415,7 +442,7 @@ fun LogViewerSheet(
                 if (logs.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "Nenhum log registrado ainda.",
+                            text = stringResource(R.string.no_logs_yet),
                             color = Color.Gray,
                             fontFamily = FontFamily.Monospace
                         )
@@ -450,7 +477,7 @@ fun LogViewerSheet(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(text = "Fechar Logs")
+                Text(text = stringResource(R.string.close_logs))
             }
         }
     }
@@ -462,6 +489,7 @@ fun ModelStatusCard(
     isModelDownloaded: Boolean,
     isDownloading: Boolean,
     progress: Float,
+    languageLabel: String,
     onClick: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
@@ -469,37 +497,34 @@ fun ModelStatusCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = if (isModelDownloaded)
-                MaterialTheme.colorScheme.secondaryContainer
-            else
-                MaterialTheme.colorScheme.tertiaryContainer
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = if (isModelDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
                     contentDescription = null,
-                    tint = if (isModelDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+                    tint = if (isModelDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (isModelDownloaded) "Modelo Whisper Pronto (Offline)" else "Modelo Whisper Não Baixado",
+                        text = if (isModelDownloaded) stringResource(R.string.model_ready) else stringResource(R.string.model_not_downloaded),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = if (isModelDownloaded)
-                            "${selectedModel.displayName} • ${selectedModel.sizeLabel} • Transcrição em Português"
+                            stringResource(R.string.model_ready_details, selectedModel.displayName, selectedModel.sizeLabel, languageLabel)
                         else
-                            "${selectedModel.displayName} • Requer download de ${selectedModel.sizeLabel}",
+                            stringResource(R.string.model_missing_details, selectedModel.displayName, selectedModel.sizeLabel),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
                 Text(
-                    text = "Trocar",
+                    text = stringResource(R.string.change),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
@@ -514,7 +539,7 @@ fun ModelStatusCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Baixando ${selectedModel.displayName}: ${(progress * 100).toInt()}%",
+                    text = stringResource(R.string.downloading_model_percent, selectedModel.displayName, (progress * 100).toInt()),
                     style = MaterialTheme.typography.labelSmall
                 )
             } else if (!isModelDownloaded) {
@@ -525,14 +550,14 @@ fun ModelStatusCard(
                 ) {
                     Icon(imageVector = Icons.Default.Download, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Baixar ${selectedModel.displayName} (${selectedModel.sizeLabel})")
+                    Text(text = stringResource(R.string.download_model_size, selectedModel.displayName, selectedModel.sizeLabel))
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ModelPickerSheet(
     models: List<WhisperModelDef>,
@@ -541,7 +566,9 @@ fun ModelPickerSheet(
     isDownloading: Boolean,
     downloadingModelId: String?,
     downloadProgress: Float,
+    selectedLanguage: TranscriptionLanguage,
     onSelectModel: (WhisperModelDef) -> Unit,
+    onSelectLanguage: (TranscriptionLanguage) -> Unit,
     onDownloadModel: () -> Unit,
     onDeleteModel: (WhisperModelDef) -> Unit,
     onDismiss: () -> Unit
@@ -559,12 +586,12 @@ fun ModelPickerSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "Escolher Modelo Whisper",
+                text = stringResource(R.string.pick_model_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Todos funcionam offline em Português. Modelos maiores são mais precisos, porém mais lentos.",
+                text = stringResource(R.string.pick_model_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -587,6 +614,33 @@ fun ModelPickerSheet(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            HorizontalDivider()
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = stringResource(R.string.transcription_language_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TranscriptionLanguage.entries.forEach { language ->
+                    FilterChip(
+                        selected = language == selectedLanguage,
+                        onClick = { onSelectLanguage(language) },
+                        label = { Text(text = stringResource(language.labelRes)) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -605,12 +659,12 @@ fun ModelPickerItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.secondaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceVariant
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -626,9 +680,9 @@ fun ModelPickerItem(
                 },
                 contentDescription = null,
                 tint = when {
-                    isDownloadingThis -> MaterialTheme.colorScheme.tertiary
+                    isDownloadingThis -> MaterialTheme.colorScheme.primary
                     isDownloaded -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.outline
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
             )
 
@@ -645,7 +699,7 @@ fun ModelPickerItem(
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = MaterialTheme.shapes.extraSmall,
-                            color = MaterialTheme.colorScheme.primaryContainer
+                            color = MaterialTheme.colorScheme.primary
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
@@ -655,13 +709,13 @@ fun ModelPickerItem(
                                     imageVector = Icons.Default.Star,
                                     contentDescription = null,
                                     modifier = Modifier.size(11.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = MaterialTheme.colorScheme.onPrimary
                                 )
                                 Spacer(modifier = Modifier.width(2.dp))
                                 Text(
-                                    text = "Recomendado",
+                                    text = stringResource(R.string.recommended),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.onPrimary
                                 )
                             }
                         }
@@ -673,7 +727,7 @@ fun ModelPickerItem(
                             color = MaterialTheme.colorScheme.primary
                         ) {
                             Text(
-                                text = "Em uso",
+                                text = stringResource(R.string.in_use),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
@@ -683,7 +737,12 @@ fun ModelPickerItem(
                 }
 
                 Text(
-                    text = "${model.sizeLabel} • Velocidade: ${model.speedLabel} • RAM mín.: ${model.minRamGb}GB",
+                    text = stringResource(
+                        R.string.model_specs,
+                        model.displayName,
+                        stringResource(model.speedLabelRes),
+                        model.minRamGb
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -695,7 +754,7 @@ fun ModelPickerItem(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        text = "Baixando: ${(downloadProgress * 100).toInt()}%",
+                        text = stringResource(R.string.downloading_percent, (downloadProgress * 100).toInt()),
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
@@ -706,12 +765,12 @@ fun ModelPickerItem(
             } else if (isDownloaded) {
                 if (!isSelected) {
                     TextButton(onClick = { onSelectModel(model) }) {
-                        Text(text = "Usar")
+                        Text(text = stringResource(R.string.use))
                     }
                     IconButton(onClick = { onDeleteModel(model) }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Excluir modelo",
+                            contentDescription = stringResource(R.string.delete_model_cd),
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
@@ -723,7 +782,7 @@ fun ModelPickerItem(
                 }) {
                     Icon(imageVector = Icons.Default.Download, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Baixar")
+                    Text(text = stringResource(R.string.download))
                 }
             }
         }
@@ -744,7 +803,9 @@ fun TranscriptionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -791,13 +852,14 @@ fun TranscriptionCard(
                 IconButton(onClick = onCopyClick) {
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "Copiar Texto"
+                        contentDescription = stringResource(R.string.copy_text_cd)
                     )
                 }
                 IconButton(onClick = onDeleteClick) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Excluir"
+                        contentDescription = stringResource(R.string.delete_cd),
+                        tint = MaterialTheme.colorScheme.error
                     )
                 }
             }
@@ -818,7 +880,7 @@ fun TranscriptionDetailDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
-                Text(text = "Detalhes da Transcrição")
+                Text(text = stringResource(R.string.detail_title))
                 Text(
                     text = dateStr,
                     style = MaterialTheme.typography.labelMedium,
@@ -834,7 +896,7 @@ fun TranscriptionDetailDialog(
             ) {
                 entity.audioFilename?.let { name ->
                     Text(
-                        text = "Arquivo: $name",
+                        text = stringResource(R.string.file_label, name),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -858,20 +920,20 @@ fun TranscriptionDetailDialog(
             Button(onClick = onCopyClick) {
                 Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "Copiar Texto")
+                Text(text = stringResource(R.string.copy_text))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(text = "Fechar")
+                Text(text = stringResource(R.string.close))
             }
         }
     )
 }
 
-private fun copyToClipboard(context: Context, text: String) {
+private fun copyToClipboard(context: Context, text: String, copiedMessage: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val clip = ClipData.newPlainText("Awedio Transcription", text)
     clipboard.setPrimaryClip(clip)
-    Toast.makeText(context, "Texto copiado para a área de transferência!", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
 }

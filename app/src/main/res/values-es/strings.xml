@@ -1,0 +1,90 @@
+<resources>
+    <string name="app_name">awedio</string>
+    <string name="app_title">Awedio</string>
+    <string name="subtitle">Transcriptor Offline de Notas de Voz</string>
+
+    <string name="clear_history_cd">Borrar historial</string>
+    <string name="history_title">Historial de Transcripciones</string>
+    <string name="history_count">%1$d elemento(s)</string>
+    <string name="empty_history_title">Aún no hay transcripciones.</string>
+    <string name="empty_history_hint">¡Comparte un audio de WhatsApp con Awedio!</string>
+    <string name="close">Cerrar</string>
+
+    <string name="msg_audio_received">¡Audio recibido! Procesando…</string>
+    <string name="msg_wait_download">Espera a que termine la descarga antes de cambiar de modelo.</string>
+    <string name="msg_model_selected">Modelo %1$s seleccionado.</string>
+    <string name="msg_model_selected_download">Modelo %1$s seleccionado. Descárgalo (%2$s) para usarlo.</string>
+    <string name="msg_downloading">Descargando %1$s (%2$s)…</string>
+    <string name="msg_model_installed">¡Modelo %1$s instalado con éxito!</string>
+    <string name="msg_download_error">Error de descarga: %1$s</string>
+    <string name="unknown_error">error desconocido</string>
+    <string name="msg_cannot_delete_in_use">No se puede eliminar el modelo en uso. Selecciona otro modelo primero.</string>
+    <string name="msg_model_deleted">Modelo %1$s eliminado.</string>
+    <string name="msg_model_delete_error">Error al eliminar el modelo %1$s.</string>
+    <string name="msg_download_to_transcribe">Descarga el modelo %1$s (%2$s) para transcribir sin conexión.</string>
+    <string name="msg_accessing_audio">Accediendo a la nota de voz compartida…</string>
+    <string name="err_access_audio">Error: No se pudo acceder al archivo de audio.</string>
+    <string name="msg_converting">Convirtiendo audio a PCM de 16 kHz…</string>
+    <string name="err_conversion">Error: Falló la conversión del archivo de audio.</string>
+    <string name="msg_transcribing">Transcribiendo con %1$s (%2$s)…</string>
+    <string name="err_model_init">Error: No se pudo inicializar el modelo Whisper.</string>
+    <string name="err_no_samples">Error: No se extrajeron muestras de audio válidas.</string>
+    <string name="err_transcription">Error durante la transcripción: %1$s</string>
+    <string name="msg_no_speech">Audio procesado (no se detectó voz).</string>
+    <string name="msg_transcription_complete">¡Transcripción completada con éxito!</string>
+    <string name="err_save">Error al guardar la transcripción: %1$s</string>
+    <string name="msg_copied">¡Texto copiado al portapapeles!</string>
+
+    <string name="dialog_model_required_title">Modelo Whisper Requerido</string>
+    <string name="dialog_model_required_body">Para transcribir audio sin conexión, descarga el modelo %1$s (%2$s) una sola vez. ¿Descargar ahora?</string>
+    <string name="download_model">Descargar Modelo</string>
+    <string name="cancel">Cancelar</string>
+
+    <string name="log_share_subject">Awedio - Registros del Sistema</string>
+    <string name="log_clip_label">Registros de Awedio</string>
+    <string name="no_logs">Sin registros.</string>
+    <string name="share_logs">Compartir registros</string>
+    <string name="err_share_logs">Error al compartir registros.</string>
+    <string name="logs_title">Registros del Sistema</string>
+    <string name="log_count">%1$d línea(s)</string>
+    <string name="copy_logs_cd">Copiar registros</string>
+    <string name="clear_logs_cd">Borrar registros</string>
+    <string name="no_logs_yet">Aún no hay registros.</string>
+    <string name="close_logs">Cerrar Registros</string>
+
+    <string name="model_ready">Modelo Whisper Listo (Sin conexión)</string>
+    <string name="model_not_downloaded">Modelo Whisper No Descargado</string>
+    <string name="model_ready_details">%1$s • %2$s • Transcripción: %3$s</string>
+    <string name="model_missing_details">%1$s • Descarga requerida: %2$s</string>
+    <string name="change">Cambiar</string>
+    <string name="downloading_model_percent">Descargando %1$s: %2$d%%</string>
+    <string name="download_model_size">Descargar %1$s (%2$s)</string>
+
+    <string name="pick_model_title">Elegir Modelo Whisper</string>
+    <string name="pick_model_subtitle">Todos funcionan sin conexión. Los modelos más grandes son más precisos, pero más lentos.</string>
+    <string name="recommended">Recomendado</string>
+    <string name="in_use">En uso</string>
+    <string name="model_specs">%1$s • Velocidad: %2$s • RAM mín.: %3$d GB</string>
+    <string name="downloading_percent">Descargando: %1$d%%</string>
+    <string name="use">Usar</string>
+    <string name="delete_model_cd">Eliminar modelo</string>
+    <string name="download">Descargar</string>
+
+    <string name="copy_text">Copiar Texto</string>
+    <string name="copy_text_cd">Copiar texto</string>
+    <string name="delete_cd">Eliminar</string>
+    <string name="detail_title">Detalles de la Transcripción</string>
+    <string name="file_label">Archivo: %1$s</string>
+
+    <string name="speed_fast">Rápido</string>
+    <string name="speed_medium">Medio</string>
+    <string name="speed_good">Bueno</string>
+    <string name="speed_very_slow">Muy lento</string>
+
+    <string name="transcription_language_title">Idioma de Transcripción</string>
+    <string name="lang_device">Idioma del dispositivo</string>
+    <string name="lang_auto">Detección automática</string>
+    <string name="lang_en">Inglés</string>
+    <string name="lang_pt">Portugués</string>
+    <string name="lang_es">Español</string>
+</resources>

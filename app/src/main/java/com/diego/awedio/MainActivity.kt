@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
 
             if (audioUri != null) {
                 AppLogger.i(TAG, "Successfully extracted audio Uri: $audioUri")
-                Toast.makeText(this, "Áudio recebido! Processando...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.msg_audio_received), Toast.LENGTH_SHORT).show()
                 viewModel.handleSharedAudioUri(audioUri)
             } else {
                 AppLogger.e(TAG, "Received share intent ($action) but no valid audio Uri was extracted.")

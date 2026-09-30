@@ -1,3 +1,90 @@
 <resources>
     <string name="app_name">awedio</string>
+    <string name="app_title">Awedio</string>
+    <string name="subtitle">Offline Voice Note Transcription</string>
+
+    <string name="clear_history_cd">Clear history</string>
+    <string name="history_title">Transcription History</string>
+    <string name="history_count">%1$d item(s)</string>
+    <string name="empty_history_title">No transcriptions yet.</string>
+    <string name="empty_history_hint">Share an audio with Awedio from WhatsApp or any app!</string>
+    <string name="close">Close</string>
+
+    <string name="msg_audio_received">Audio received! Processing…</string>
+    <string name="msg_wait_download">Wait for the download to finish before switching models.</string>
+    <string name="msg_model_selected">Model %1$s selected.</string>
+    <string name="msg_model_selected_download">Model %1$s selected. Download it (%2$s) to use.</string>
+    <string name="msg_downloading">Downloading %1$s (%2$s)…</string>
+    <string name="msg_model_installed">Model %1$s installed successfully!</string>
+    <string name="msg_download_error">Download error: %1$s</string>
+    <string name="unknown_error">unknown error</string>
+    <string name="msg_cannot_delete_in_use">Can\'t delete the model in use. Select another model first.</string>
+    <string name="msg_model_deleted">Model %1$s deleted.</string>
+    <string name="msg_model_delete_error">Error deleting model %1$s.</string>
+    <string name="msg_download_to_transcribe">Download the %1$s model (%2$s) to transcribe offline.</string>
+    <string name="msg_accessing_audio">Accessing shared audio…</string>
+    <string name="err_access_audio">Error: Could not access the audio file.</string>
+    <string name="msg_converting">Converting audio to 16 kHz PCM…</string>
+    <string name="err_conversion">Error: Audio conversion failed.</string>
+    <string name="msg_transcribing">Transcribing with %1$s (%2$s)…</string>
+    <string name="err_model_init">Error: Could not initialize the Whisper model.</string>
+    <string name="err_no_samples">Error: No valid audio samples were extracted.</string>
+    <string name="err_transcription">Error during transcription: %1$s</string>
+    <string name="msg_no_speech">Audio processed (no speech detected).</string>
+    <string name="msg_transcription_complete">Transcription completed successfully!</string>
+    <string name="err_save">Error saving transcription: %1$s</string>
+    <string name="msg_copied">Text copied to clipboard!</string>
+
+    <string name="dialog_model_required_title">Whisper Model Required</string>
+    <string name="dialog_model_required_body">To transcribe audio offline, download the %1$s model (%2$s) once. Download it now?</string>
+    <string name="download_model">Download Model</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="log_share_subject">Awedio - System Logs</string>
+    <string name="log_clip_label">Awedio Logs</string>
+    <string name="no_logs">No logs recorded.</string>
+    <string name="share_logs">Share logs</string>
+    <string name="err_share_logs">Error sharing logs.</string>
+    <string name="logs_title">System Logs</string>
+    <string name="log_count">%1$d line(s)</string>
+    <string name="copy_logs_cd">Copy logs</string>
+    <string name="clear_logs_cd">Clear logs</string>
+    <string name="no_logs_yet">No logs recorded yet.</string>
+    <string name="close_logs">Close Logs</string>
+
+    <string name="model_ready">Whisper Model Ready (Offline)</string>
+    <string name="model_not_downloaded">Whisper Model Not Downloaded</string>
+    <string name="model_ready_details">%1$s • %2$s • Transcription: %3$s</string>
+    <string name="model_missing_details">%1$s • Download required: %2$s</string>
+    <string name="change">Change</string>
+    <string name="downloading_model_percent">Downloading %1$s: %2$d%%</string>
+    <string name="download_model_size">Download %1$s (%2$s)</string>
+
+    <string name="pick_model_title">Choose Whisper Model</string>
+    <string name="pick_model_subtitle">All models run fully offline. Larger models are more accurate but slower.</string>
+    <string name="recommended">Recommended</string>
+    <string name="in_use">In use</string>
+    <string name="model_specs">%1$s • Speed: %2$s • Min. RAM: %3$d GB</string>
+    <string name="downloading_percent">Downloading: %1$d%%</string>
+    <string name="use">Use</string>
+    <string name="delete_model_cd">Delete model</string>
+    <string name="download">Download</string>
+
+    <string name="copy_text">Copy Text</string>
+    <string name="copy_text_cd">Copy text</string>
+    <string name="delete_cd">Delete</string>
+    <string name="detail_title">Transcription Details</string>
+    <string name="file_label">File: %1$s</string>
+
+    <string name="speed_fast">Fast</string>
+    <string name="speed_medium">Medium</string>
+    <string name="speed_good">Good</string>
+    <string name="speed_very_slow">Very slow</string>
+
+    <string name="transcription_language_title">Transcription Language</string>
+    <string name="lang_device">Device language</string>
+    <string name="lang_auto">Auto-detect</string>
+    <string name="lang_en">English</string>
+    <string name="lang_pt">Portuguese</string>
+    <string name="lang_es">Spanish</string>
 </resources>
