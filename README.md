@@ -2,6 +2,10 @@
 
 # awedio
 
+[![Release](https://img.shields.io/github/v/release/diegosoriarios/Awedio?label=release&logo=github)](https://github.com/diegosoriarios/Awedio/releases)
+[![Min API](https://img.shields.io/badge/Android-8.0%2B%20(API%2026)-3DDC84?logo=android&logoColor=white)](https://developer.android.com/about/versions/oreo)
+[![Powered by whisper.cpp](https://img.shields.io/badge/powered%20by-whisper.cpp-blueviolet)](https://github.com/ggml-org/whisper.cpp)
+
 Offline, on-device **speech-to-text for Android** powered by [whisper.cpp](https://github.com/ggml-org/whisper.cpp).
 No accounts, no cloud, no telemetry — your audio never leaves the phone.
 
@@ -15,16 +19,24 @@ or transcribe audio files directly.
 
   | Model | Size | Speed | RAM |
   |---|---|---|---|
-  | Whisper Base | ~148 MB | Rápido | 1 GB |
-  | Whisper Small (Q5_1) | ~190 MB | Médio | 2 GB |
-  | Whisper Large-v3 Turbo (Q5_0) ★ | ~574 MB | Bom | 3 GB |
-  | Whisper Large-v3 (Q5_0) | ~1.1 GB | Muito lento | 4 GB |
+  | Whisper Base | ~148 MB | Fast | 1 GB |
+  | Whisper Small (Q5_1) | ~190 MB | Medium | 2 GB |
+  | Whisper Large-v3 Turbo (Q5_0) ★ | ~574 MB | Good | 3 GB |
+  | Whisper Large-v3 (Q5_0) | ~1.1 GB | Very slow | 4 GB |
 
   Models are downloaded on demand from Hugging Face and managed in-app
 - **Share target** — send audio from any app via the Android share sheet
+- **90+ languages** — transcription language follows your device (or pick one manually, with auto-detect)
+- **App in your language** — UI available in English, Portuguese and Spanish
 - **Transcription history** — stored locally in a Room database
 - **Copy / share results** — transcripts can be shared back out to other apps
 - Material 3 UI (Jetpack Compose)
+
+## Languages
+
+The UI automatically follows the device language (English, Portuguese or Spanish).
+The transcription language defaults to the device language too and can be changed at any time
+in the model picker sheet — including auto-detect for multilingual audio.
 
 ## Requirements
 
