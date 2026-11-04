@@ -32,8 +32,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -76,6 +78,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.diego.awedio.R
 import com.diego.awedio.data.TranscriptionEntity
+import com.diego.awedio.data.TranscriptionStatus
 import com.diego.awedio.model.TranscriptionLanguage
 import com.diego.awedio.model.WhisperModelDef
 import com.diego.awedio.model.WhisperModels
@@ -798,12 +801,24 @@ fun TranscriptionCard(
 ) {
     val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
     val dateStr = dateFormat.format(Date(item.timestamp))
+    val status = try {
+        TranscriptionStatus.valueOf(item.status)
+    } catch (_: IllegalArgumentException) {
+        TranscriptionStatus.DONE
+    }
+    val isDone = status == TranscriptionStatus.DONE
+    val isQueued = status == TranscriptionStatus.QUEUED
+    val isProcessing = status == TranscriptionStatus.PROCESSING
+    val isError = status == TranscriptionStatus.ERROR
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            .then(if (isQueued || isProcessing) Modifier else Modifier.clickable { onClick() }),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isError) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+            else MaterialTheme.colorScheme.surface
+        ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -818,30 +833,82 @@ fun TranscriptionCard(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                item.durationSeconds?.let { dur ->
-                    val min = dur / 60
-                    val sec = dur % 60
-                    Surface(
-                        shape = MaterialTheme.shapes.extraSmall,
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Text(
-                            text = String.format(Locale.getDefault(), "%02d:%02d", min, sec),
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+
+                when {
+                    isQueued -> StatusChip(
+                        text = stringResource(R.string.status_queued),
+                        icon = { Icon(imageVector = Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                    )
+                    isProcessing -> StatusChip(
+                        text = stringResource(R.string.status_processing),
+                        icon = {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                strokeWidth = 1.5.dp
+                            )
+                        }
+                    )
+                    isError -> StatusChip(
+                        text = stringResource(R.string.status_error),
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.ErrorOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    )
+                    else -> item.durationSeconds?.let { dur ->
+                        val min = dur / 60
+                        val sec = dur % 60
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = String.format(Locale.getDefault(), "%02d:%02d", min, sec),
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            item.displayName?.let { name ->
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
-            Text(
-                text = item.transcribedText,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
+            when {
+                isQueued || isProcessing -> Unit
+                isError -> {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = item.transcribedText.ifBlank { stringResource(R.string.status_error_generic) },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                else -> {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = item.transcribedText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -849,11 +916,13 @@ fun TranscriptionCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                IconButton(onClick = onCopyClick) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = stringResource(R.string.copy_text_cd)
-                    )
+                if (isDone) {
+                    IconButton(onClick = onCopyClick) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = stringResource(R.string.copy_text_cd)
+                        )
+                    }
                 }
                 IconButton(onClick = onDeleteClick) {
                     Icon(
@@ -863,6 +932,29 @@ fun TranscriptionCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StatusChip(
+    text: String,
+    icon: @Composable () -> Unit
+) {
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            icon()
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
@@ -894,7 +986,7 @@ fun TranscriptionDetailDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
-                entity.audioFilename?.let { name ->
+                (entity.displayName ?: entity.audioFilename)?.let { name ->
                     Text(
                         text = stringResource(R.string.file_label, name),
                         style = MaterialTheme.typography.labelSmall,

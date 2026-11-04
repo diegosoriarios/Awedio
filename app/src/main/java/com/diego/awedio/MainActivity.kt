@@ -51,12 +51,16 @@ class MainActivity : ComponentActivity() {
         AppLogger.i(TAG, "Processing incoming intent: action=$action, type=$type")
 
         if (Intent.ACTION_SEND == action || Intent.ACTION_VIEW == action || Intent.ACTION_SEND_MULTIPLE == action) {
-            val audioUri = extractAudioUri(intent)
+            val audioUris = extractAudioUris(intent)
 
-            if (audioUri != null) {
-                AppLogger.i(TAG, "Successfully extracted audio Uri: $audioUri")
-                Toast.makeText(this, getString(R.string.msg_audio_received), Toast.LENGTH_SHORT).show()
-                viewModel.handleSharedAudioUri(audioUri)
+            if (audioUris.isNotEmpty()) {
+                AppLogger.i(TAG, "Successfully extracted ${audioUris.size} audio Uri(s)")
+                if (audioUris.size == 1) {
+                    Toast.makeText(this, getString(R.string.msg_audio_received), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, getString(R.string.msg_audio_received_multiple, audioUris.size), Toast.LENGTH_SHORT).show()
+                }
+                viewModel.handleSharedAudioUris(audioUris)
             } else {
                 AppLogger.e(TAG, "Received share intent ($action) but no valid audio Uri was extracted.")
             }
@@ -65,8 +69,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun extractAudioUri(intent: Intent): Uri? {
-        // 1. Try EXTRA_STREAM (Single)
+    private fun extractAudioUris(intent: Intent): List<Uri> {
+        // 1. Try EXTRA_STREAM as ArrayList (normal ACTION_SEND_MULTIPLE path)
+        val multipleUris = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+        }
+        if (!multipleUris.isNullOrEmpty()) {
+            AppLogger.i(TAG, "Extracted ${multipleUris.size} Uri(s) from EXTRA_STREAM ArrayList")
+            return multipleUris.toList()
+        }
+
+        // 2. Try EXTRA_STREAM (Single)
         val extraStreamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         } else {
@@ -75,38 +91,27 @@ class MainActivity : ComponentActivity() {
         }
         if (extraStreamUri != null) {
             AppLogger.i(TAG, "Extracted Uri from EXTRA_STREAM: $extraStreamUri")
-            return extraStreamUri
+            return listOf(extraStreamUri)
         }
 
-        // 2. Try ClipData
+        // 3. Try ClipData (all items)
         val clipData = intent.clipData
         if (clipData != null && clipData.itemCount > 0) {
-            val itemUri = clipData.getItemAt(0).uri
-            if (itemUri != null) {
-                AppLogger.i(TAG, "Extracted Uri from ClipData: $itemUri")
-                return itemUri
+            val uris = (0 until clipData.itemCount).mapNotNull { clipData.getItemAt(it).uri }
+            if (uris.isNotEmpty()) {
+                AppLogger.i(TAG, "Extracted ${uris.size} Uri(s) from ClipData")
+                return uris
             }
         }
 
-        // 3. Try intent.data
-        if (intent.data != null) {
-            AppLogger.i(TAG, "Extracted Uri from intent.data: ${intent.data}")
-            return intent.data
+        // 4. Try intent.data
+        val dataUri = intent.data
+        if (dataUri != null) {
+            AppLogger.i(TAG, "Extracted Uri from intent.data: $dataUri")
+            return listOf(dataUri)
         }
 
-        // 4. Try EXTRA_STREAM (Multiple list fallback)
-        val multipleUris = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
-        }
-        if (!multipleUris.isNullOrEmpty()) {
-            AppLogger.i(TAG, "Extracted Uri from EXTRA_STREAM ArrayList: ${multipleUris[0]}")
-            return multipleUris[0]
-        }
-
-        return null
+        return emptyList()
     }
 
     companion object {

@@ -11,6 +11,15 @@
     <string name="close">Close</string>
 
     <string name="msg_audio_received">Audio received! Processing…</string>
+    <string name="msg_audio_received_multiple">%1$d audio file(s) received!</string>
+    <string name="msg_batch_queued_download">%1$d audio file(s) queued. Download the %2$s model (%3$s) to start.</string>
+    <string name="msg_transcribing_progress">Transcribing %1$d of %2$d…</string>
+    <string name="msg_batch_done">Finished: %1$d of %2$d transcribed.</string>
+    <string name="msg_batch_done_errors">Finished: %1$d of %2$d transcribed, %3$d failed.</string>
+    <string name="status_queued">Queued</string>
+    <string name="status_processing">Transcribing…</string>
+    <string name="status_error">Failed</string>
+    <string name="status_error_generic">Transcription failed.</string>
     <string name="msg_wait_download">Wait for the download to finish before switching models.</string>
     <string name="msg_model_selected">Model %1$s selected.</string>
     <string name="msg_model_selected_download">Model %1$s selected. Download it (%2$s) to use.</string>
