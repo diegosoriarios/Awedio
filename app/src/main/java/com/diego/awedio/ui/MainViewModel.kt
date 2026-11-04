@@ -47,6 +47,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val remainingAutoOpen = AtomicInteger(0)
     private val _queueProgress = MutableStateFlow<QueueProgress?>(null)
 
+    private var whisperContextPtr: Long = 0L
+    private var whisperContextModelId: String? = null
+
     private val _transcriptionsList = MutableStateFlow<List<TranscriptionEntity>>(emptyList())
     val transcriptions: StateFlow<List<TranscriptionEntity>> = _transcriptionsList.asStateFlow()
 
@@ -347,6 +350,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (done >= current.total) {
                 _queueProgress.value = null
                 _isTranscribing.value = false
+                releaseWhisperContext()
                 val succeeded = current.total - failedCount
                 _statusMessage.value = if (failedCount > 0) {
                     UiMessage(R.string.msg_batch_done_errors, listOf(succeeded, current.total, failedCount))
@@ -466,6 +470,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun ensureWhisperContext(model: WhisperModelDef, modelFile: File): Long {
+        if (whisperContextPtr != 0L && whisperContextModelId == model.id) {
+            AppLogger.i(TAG, "Reusing cached whisper context for model [${model.id}].")
+            return whisperContextPtr
+        }
+        releaseWhisperContext()
+        AppLogger.i(TAG, "Initializing Whisper JNI context with model: ${modelFile.absolutePath}")
+        val ptr = whisperLib.initContext(modelFile.absolutePath)
+        if (ptr != 0L) {
+            whisperContextPtr = ptr
+            whisperContextModelId = model.id
+        }
+        return ptr
+    }
+
+    private fun releaseWhisperContext() {
+        if (whisperContextPtr != 0L) {
+            try {
+                whisperLib.freeContext(whisperContextPtr)
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Error freeing whisper context: ${e.message}", e)
+            }
+            whisperContextPtr = 0L
+            whisperContextModelId = null
+        }
+    }
+
+    override fun onCleared() {
+        releaseWhisperContext()
+        super.onCleared()
+    }
+
     private fun transcribeWithWhisper(
         appContext: Context,
         model: WhisperModelDef,
@@ -474,8 +510,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ): Pair<Boolean, String> {
         return try {
             val modelFile = ModelManager.getModelFile(appContext, model)
-            AppLogger.i(TAG, "Initializing Whisper JNI context with model: ${modelFile.absolutePath}")
-            val ctxPtr = whisperLib.initContext(modelFile.absolutePath)
+            val ctxPtr = ensureWhisperContext(model, modelFile)
             if (ctxPtr == 0L) {
                 AppLogger.e(TAG, "Failed to init whisper context (returned 0)")
                 return true to appContext.getString(R.string.err_model_init)
@@ -483,14 +518,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val samples = WhisperLib.readWavSamples(wavFile)
             if (samples.isEmpty()) {
-                whisperLib.freeContext(ctxPtr)
                 AppLogger.e(TAG, "Audio sample buffer was empty after reading WAV")
                 return true to appContext.getString(R.string.err_no_samples)
             }
 
-            AppLogger.i(TAG, "Calling whisperLib.transcribeBuffer for ${samples.size} samples (language=$whisperLanguage)...")
-            val result = whisperLib.transcribeBuffer(ctxPtr, samples, whisperLanguage)
-            whisperLib.freeContext(ctxPtr)
+            AppLogger.i(TAG, "Calling whisperLib.transcribeBuffer for ${samples.size} samples (language=$whisperLanguage, beam=${model.beamSize})...")
+            val result = whisperLib.transcribeBuffer(ctxPtr, samples, whisperLanguage, model.beamSize)
             AppLogger.i(TAG, "Whisper transcription returned text length: ${result.length}")
             false to result
         } catch (e: Exception) {

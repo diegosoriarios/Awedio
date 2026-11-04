@@ -1,6 +1,8 @@
 #include <jni.h>
 #include <string>
 #include <vector>
+#include <thread>
+#include <algorithm>
 #include <android/log.h>
 
 #define LOG_TAG "WhisperJNI"
@@ -48,6 +50,7 @@ Java_com_diego_awedio_whisper_WhisperLib_initContext(
 #if __has_include("whisper.h")
     struct whisper_context_params cparams = whisper_context_default_params();
     cparams.use_gpu = false;
+    cparams.flash_attn = true;
     struct whisper_context *ctx = whisper_init_from_file_with_params(model_path, cparams);
 #else
     // Fallback if full native whisper library is dynamically linked
@@ -85,7 +88,8 @@ Java_com_diego_awedio_whisper_WhisperLib_transcribeBuffer(
         jobject thiz,
         jlong context_ptr,
         jfloatArray samples_array,
-        jstring lang_str) {
+        jstring lang_str,
+        jint beam_size) {
     if (context_ptr == 0) {
         LOGE("Cannot transcribe: Context pointer is null");
         return env->NewStringUTF("Error: Context is null");
@@ -114,9 +118,25 @@ Java_com_diego_awedio_whisper_WhisperLib_transcribeBuffer(
     params.print_timestamps = false;
     params.print_special = false;
     params.translate = false;
-    params.language = lang; // "pt" for Portuguese
-    params.n_threads = 4;
+    params.language = lang;
     params.offset_ms = 0;
+
+    unsigned int hw_threads = std::thread::hardware_concurrency();
+    params.n_threads = hw_threads > 0 ? std::min(8u, hw_threads) : 4;
+    LOGI("Using %d threads", params.n_threads);
+
+    // Greedy decoding without temperature fallback: avoids re-decoding
+    // segments at rising temperatures (major speedup, minimal quality loss).
+    params.temperature = 0.0f;
+    params.temperature_inc = 0.0f;
+
+    if (beam_size > 1) {
+        params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
+        params.beam_search.beam_size = beam_size;
+        LOGI("Using beam search with beam size %d", beam_size);
+    } else {
+        params.greedy.best_of = 1;
+    }
 
     int ret = whisper_full(ctx, params, samples, n_samples);
 

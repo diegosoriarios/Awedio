@@ -10,7 +10,7 @@ class WhisperLib {
 
     external fun initContext(modelPath: String): Long
     external fun freeContext(contextPtr: Long)
-    external fun transcribeBuffer(contextPtr: Long, samples: FloatArray, language: String): String
+    external fun transcribeBuffer(contextPtr: Long, samples: FloatArray, language: String, beamSize: Int): String
 
     companion object {
         private const val TAG = "WhisperLib"

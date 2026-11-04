@@ -11,7 +11,8 @@ data class WhisperModelDef(
     val sizeBytes: Long,
     @StringRes val speedLabelRes: Int,
     val minRamGb: Int,
-    val recommended: Boolean = false
+    val recommended: Boolean = false,
+    val beamSize: Int = 1
 ) {
     val sizeLabel: String
         get() {
@@ -46,7 +47,8 @@ object WhisperModels {
         url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin",
         sizeBytes = 190_085_487L,
         speedLabelRes = R.string.speed_medium,
-        minRamGb = 2
+        minRamGb = 2,
+        beamSize = 5
     )
 
     val LARGE_V3_TURBO_Q5_0 = WhisperModelDef(

@@ -91,6 +91,7 @@
     <string name="speed_very_slow">Muy lento</string>
 
     <string name="transcription_language_title">Idioma de Transcripción</string>
+    <string name="language_autodetect_hint">Consejo: la detección automática puede fallar en modelos pequeños — elegir un idioma da la mejor precisión.</string>
     <string name="lang_device">Idioma del dispositivo</string>
     <string name="lang_auto">Detección automática</string>
     <string name="lang_en">Inglés</string>

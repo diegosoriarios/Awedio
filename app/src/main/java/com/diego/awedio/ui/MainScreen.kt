@@ -643,6 +643,14 @@ fun ModelPickerSheet(
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = stringResource(R.string.language_autodetect_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
